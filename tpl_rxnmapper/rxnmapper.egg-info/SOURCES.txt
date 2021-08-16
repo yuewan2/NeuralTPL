@@ -1,0 +1,5 @@
+setup.py
+rxnmapper.egg-info/PKG-INFO
+rxnmapper.egg-info/SOURCES.txt
+rxnmapper.egg-info/dependency_links.txt
+rxnmapper.egg-info/top_level.txt

@@ -1,0 +1,17 @@
+Metadata-Version: 2.1
+Name: rxnmapper
+Version: 0.1.4
+Summary: Reaction atom-mapping from transfomers
+Home-page: https://github.com/rxn4chemistry/rxnmapper
+Author: RXNMapper team
+Author-email: phs@zurich.ibm.com, benjamin.hoover@ibm.com
+License: MIT
+Description: Reaction atom-mapping from transfomers
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Description-Content-Type: text/markdown
