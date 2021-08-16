@@ -12,7 +12,6 @@ from rdchiral.template_extractor import extract_from_reaction
 from utils.tpl_utils.test_mask_tpl import smi_tokenizer
 from utils.data_utils import extract_mapping
 
-BASE='/apdcephfs/private_yuewan/template_synthesis_dataset'
 
 def find_center(inputs, prod_centers, inference=False):
     rxn, tpl = inputs
@@ -47,7 +46,7 @@ def find_center(inputs, prod_centers, inference=False):
 
     return rxn, potential_reaction_centers
 
-def main():
+def main(BASE):
     raw_data = pd.read_csv(BASE + '/data/reaction/uspto-50k_tpl_modified.csv')
     raw_data = raw_data[raw_data['dataset'] != 'test']
 
@@ -71,7 +70,7 @@ def main():
         prod_smarts = tpl.split('>>')[0]
         prod_smarts, _ = extract_mapping(' '.join(smi_tokenizer(prod_smarts)))
         prod_smarts = ''.join(prod_smarts.split(' '))
-        print(prod_smarts)
+
         # Canonical smarts:
         mol = Chem.MolFromSmiles(prod_smiles)
         selected_rcs_idx = sorted(set(mol.GetSubstructMatch(Chem.MolFromSmarts(prod_smarts))))
@@ -83,9 +82,6 @@ def main():
                 atom_symbols.append(smarts.replace(am, ''))
         prod_smarts = Chem.MolFragmentToSmiles(mol, atomsToUse=selected_rcs_idx,
                                                atomSymbols=atom_symbols, allBondsExplicit=True, allHsExplicit=True)
-        print(prod_smarts)
-        a=dsad
-        
         
         prod_centers.add(prod_smarts)
         rt2prod_centers[rt].add(prod_smarts)
@@ -106,4 +102,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    BASE = '/apdcephfs/private_yuewan/template_synthesis_dataset'
+    main(BASE)
