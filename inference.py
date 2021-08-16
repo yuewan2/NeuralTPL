@@ -17,10 +17,11 @@ from utils.translate_utils import translate_batch, explain_batch
 from models.model import TemplateGenerator
 
 # LOADING VARIABLES
-BASE='/apdcephfs/private_yuewan/template_synthesis_dataset/'
+BASE=
+model_path = 
 device='cuda'
-checkpoint_path = BASE+'./checkpoint_wnoise/generalize/model_52000_wz.pt'
-print('Loading from {}'.format(checkpoint_path))
+checkpoint_path = BASE+model_path
+print('Loading from {}'.format(model_path))
 checkpoint = torch.load(checkpoint_path, map_location=device)
 model = checkpoint['model'].to(device)
 dataset_train = MainTplGenDataset(mode='train',
