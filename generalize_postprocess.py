@@ -50,7 +50,6 @@ def postprocess_am(mapped_rxn_smiles):
     return '{}>>{}'.format(Chem.MolToSmarts(prod_mol), Chem.MolToSmarts(react_mol))
 
 def assign_am(rxn_center, postprocess=False, sanitize_token=True):
-    #print('input:', ''.join(rxn_center.split(' ')))
     results = rxn_mapper.get_attention_guided_atom_maps([rxn_center],
                                                         canonicalize_rxns=False,
                                                         sanitize_token=sanitize_token)
@@ -122,7 +121,6 @@ def get_mapped_center(center, postprocess=False, sanitize_token=True):
         else:
             i += 1
 
-
     new_react_f = []
     for start, end in selected_indices:
         new_react_f += react_f.split(' ')[start:end]
@@ -161,9 +159,10 @@ def get_generalized_mapped_center(center, postprocess=False, sanitize_token=True
 
 def get_mapped_center_main(center, postprocess=False, sanitize_token=True):
     '''
-    :param center: retro template smarts (without space separated)
-    :param postprocess:
-    :param sanitize_token:
+    Main function of tagging Atom-mapping for retro-template SMARTS; basic functionality is based on RXNMapper (https://github.com/rxn4chemistry/rxnmapper)
+    :param center: retro template SMARTS (without space separated)
+    :param postprocess: whether enable SMARTS token postprocessing
+    :param sanitize_token: whether to sanitize token before the atom-mapping
     :return:
     '''
     if sanitize_token:
@@ -197,77 +196,6 @@ def get_mapped_center_main(center, postprocess=False, sanitize_token=True):
         gen_center = ''
     return gen_center
 
-def retrieve_positive_product(gen_center, raw_reaction_list):
-    prod_patt = gen_center.split('>>')[0]
-    prod_candidates = [rxn.split('>>')[1] for rxn in raw_reaction_list]
-
-    patt = Chem.MolFromSmarts(prod_patt)
-    prod_selected = []
-    for prod_smiles in prod_candidates:
-        mol = Chem.MolFromSmiles(prod_smiles)
-        if mol.GetSubstructMatches(patt):
-            prod_selected.append(prod_smiles)
-    return prod_selected
-
-def reassign_center(gen_center):
-    gen_prod_frag_token = smi_tokenizer(gen_center.split('>>')[0])
-    gen_react_frag_token = smi_tokenizer(gen_center.split('>>')[1])
-
-    atom2am_prod = {}
-    atom2pos_prod = {}
-    for i, token in enumerate(gen_prod_frag_token):
-        if token[0] == '[' and token[-1] == ']':
-            token_atom = re.match('\[(.*):([0-9]+)\]', token).group(1)
-            token_tag = re.match('\[(.*):([0-9]+)\]', token).group(2)
-            token_atom = re.sub('H[1-9]?', '', token_atom).lower()
-            atom2am_prod[token_atom] = atom2am_prod.get(token_atom, []) + [token_tag]
-            atom2pos_prod[token_atom] = atom2pos_prod.get(token_atom, []) + [i]
-
-    atom2am_react = {}
-    atom2pos_react = {}
-    for token in gen_react_frag_token:
-        if token[0] == '[' and token[-1] == ']':
-            token_atom = re.match('\[(.*):([0-9]+)\]', token).group(1)
-            token_tag = re.match('\[(.*):([0-9]+)\]', token).group(2)
-            token_atom = re.sub('H[1-9]?', '', token_atom).lower()
-            atom2am_react[token_atom] = atom2am_react.get(token_atom, []) + [token_tag]
-            atom2pos_react[token_atom] = atom2pos_react.get(token_atom, []) + [i]
-
-    # 找出unique token:
-    repeated_atom = []
-    anchor_pos = -1
-
-    for atom in atom2am_prod:
-        if len(atom2am_prod[atom]) == 1:
-            if atom2am_prod[atom][0] != atom2am_react[atom][0]:
-                anchor_pos = atom2pos_prod[atom][0]
-        else:
-            repeated_atom.append(atom)
-
-    if anchor_pos == -1:
-        return gen_center
-
-    nearest_pos = -1
-    length = float('inf')
-    for atom in repeated_atom:
-        for pos in atom2pos_prod[atom]:
-            if abs(anchor_pos-pos) < length:
-                nearest_pos = pos
-                length = abs(anchor_pos-pos)
-
-    nearest_token = gen_prod_frag_token[nearest_pos]
-    anchor_token = gen_prod_frag_token[anchor_pos]
-
-    switched_am = re.match('\[(.*):([0-9]+)\]', nearest_token).group(2)
-    gen_prod_frag_token[anchor_pos] = re.sub(':[1-9]+', ':{}'.format(switched_am), anchor_token)
-
-    switched_am = re.match('\[(.*):([0-9]+)\]', anchor_token).group(2)
-    gen_prod_frag_token[nearest_pos] = re.sub(':[1-9]+', ':{}'.format(switched_am), nearest_token)
-
-    new_gen_center = '{}>>{}'.format(''.join(gen_prod_frag_token), ''.join(gen_react_frag_token))
-    return new_gen_center
-
-
 def reassign_am(tpl):
     tpl_token = smi_tokenizer(tpl)
     tpl_naked, atom_mapping = extract_mapping(' '.join(tpl_token))
@@ -280,161 +208,3 @@ def reassign_am(tpl):
     new_tpl = reconstruct_mapping(tpl_naked, new_atom_mapping)
     return new_tpl.replace(' ','')
 
-def transform_template(gen_center, data, verbose=False):
-    #gen_center = get_mapped_center_main(center, postprocess=True)
-    if verbose:
-        print(gen_center)
-    try:
-        gen_center = reassign_center(gen_center)
-    except:
-        pass
-    if verbose:
-        print(gen_center)
-
-    # Step 1: SubstructMatch the pattern with existing reaction/product
-    prod_selected = retrieve_positive_product(gen_center, data['raw_rxn'])
-
-    if verbose:
-        print(len(prod_selected))
-    # Step 2: For the matched product, build up inferred reaction
-    rxn_candidates = []
-    for prod in prod_selected:
-        try:
-            result = rdchiralRunText(gen_center, prod, keep_mapnums=True)
-            if result:
-                for inferred_react in result:
-                    inferred_rxn = '{}>>{}'.format(inferred_react, prod)
-                    rxn_candidates.append(inferred_rxn)
-        except:
-            pass
-
-    if verbose:
-        print(len(rxn_candidates))
-
-    # Step 3: extract template from inferred reaction and select the most generalized one
-    tpl_candidates = []
-    for i in range(len(rxn_candidates)):
-        reaction = {'_id': 0, 'reactants': rxn_candidates[i].split('>>')[0],
-                    'products': rxn_candidates[i].split('>>')[1]}
-        result = extract_from_reaction(reaction)
-        if 'reaction_smarts' in result:
-            template = result['reaction_smarts']
-            tpl_candidates.append(template)
-
-    if not tpl_candidates:
-        return None
-    simplest_tpl = tpl_candidates[0]
-    for tpl in set(tpl_candidates):
-        if len(smi_tokenizer(tpl)) < len(smi_tokenizer(simplest_tpl)):
-            simplest_tpl = tpl
-
-    return simplest_tpl
-
-def multiprocess_center(gen_tpl, test_prods):
-    # tpl = transform_template(gen_center, data)
-    try:
-        gen_tpl = reassign_center(gen_tpl)
-    except:
-        pass
-
-    success_cases = []
-    try:
-        prod_f = gen_tpl.split('>>')[0]
-        mol = Chem.MolFromSmarts(prod_f)
-        for atom in mol.GetAtoms():
-            if not atom.HasProp('molAtomMapNumber'):
-                return []
-    except:
-        return []
-
-    prod_pat = Chem.MolFromSmarts(gen_tpl.split('>>')[0])
-    for prod_smiles in test_prods:
-        prod_mol = Chem.MolFromSmiles(prod_smiles)
-        if prod_mol.HasSubstructMatch(prod_pat):
-            try:
-                react_list = rdchiralRunText(gen_tpl, prod_smiles)
-                if react_list:
-                    for react_smiles in react_list:
-                        rxn = '{}>>{}'.format(react_smiles, prod_smiles)
-                        success_cases.append((rxn, gen_tpl))
-            except:
-                continue
-
-    return success_cases
-
-def main(process=True):
-    # test_data = pd.read_csv('data/template/generalized_story_tst.csv')
-    # test_prods = []
-    # for rxn in test_data['raw_rxn']:
-    #     reacts, prod = rxn.split('>>')
-    #     test_prods.append(clear_atom_map(prod))
-    # test_prods = list(set(test_prods))
-
-    train_data = pd.read_csv('data/template/generalized_story_trn.csv')
-    train_prods = []
-    for rxn in train_data['raw_rxn']:
-        reacts, prod = rxn.split('>>')
-        train_prods.append(clear_atom_map(prod))
-    train_prods = list(set(train_prods))
-
-
-    #gen_data = pd.read_csv('result/test_generalize_generated_template_model_200000_wz.pt_bsz_10.csv')
-    gen_data = pd.read_csv('result/train_generalize_generated_template_model_200000_wz.pt_bsz_10.csv')
-    src2tgt = {}
-    for i in range(gen_data.shape[0]):
-        src = gen_data.iloc[i]['masked_rxn']
-        if src not in src2tgt:
-            src2tgt[src] = [gen_data.iloc[i]['generated_center']]
-            # src2tgt[src] = [gen_data.iloc[i]['gt_center'], gen_data.iloc[i]['generated_center']]
-        else:
-            src2tgt[src].append(gen_data.iloc[i]['generated_center'])
-            src2tgt[src] = list(set(src2tgt[src]))
-
-
-    with open('novel_candidates.pk', 'rb') as f:
-        novel_candidates = pickle.load(f)
-        print('Number of Novel Candidates:', len(novel_candidates))
-
-    src2tpl = {}
-    # with open('gen_templates.pk', 'rb') as f:
-    #     src2tpl = pickle.load(f)
-    gen_centers = []
-    for i, sample_key in tqdm(enumerate(src2tgt), total=len(src2tgt)):
-        # if i < len(src2tpl)+42:
-        #     continue
-        if sample_key in src2tpl:
-            continue
-        for center in src2tgt[sample_key]:
-            if center in novel_candidates:
-                try:
-                    gen_center = get_mapped_center_main(center, postprocess=True)
-                    gen_centers.append(gen_center)
-                    #gen_centers.append(center)
-                except:
-                    continue
-
-
-    if process:
-        print('Length of gen centers:', len(gen_centers))
-
-        with Pool() as pool:
-            results = process_map(partial(multiprocess_center, test_prods=train_prods),
-                                  gen_centers)
-
-        gen_templates = []
-        for res in results:
-            gen_templates += res
-
-        with open('gen_templates_trn.pk', 'wb') as f:
-            pickle.dump(gen_templates, f)
-
-    else:
-        print('Length of gen centers:', len(gen_centers))
-        with open('gen_templates_trn_raw.pk', 'wb') as f:
-            pickle.dump(gen_centers, f)
-
-
-
-
-if __name__ == '__main__':
-    main(process=False)
