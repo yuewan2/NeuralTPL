@@ -6,6 +6,9 @@ from tqdm import tqdm
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from utils.data_utils import extract_mapping
+from rdchiral.template_extractor import extract_from_reaction
+from utils.tpl_utils.test_mask_tpl import smi_tokenizer
 
 def convert_atom_to_wildcard(atom, super_general=False):
     assert super_general
@@ -135,12 +138,7 @@ def convert_to_group_mask(masked_rxn, atom_wildcard, bond_wildcard, target_mask_
     return ' '.join(new_mapped_rxn_tokens)
 
 
-def main():
-    from utils.data_utils import extract_mapping
-    from rdchiral.template_extractor import extract_from_reaction
-    from utils.tpl_utils.test_mask_tpl import smi_tokenizer
-
-    data_folder='/apdcephfs/private_yuewan/template_synthesis_dataset'
+def main(data_folder):
     raw_data = pd.read_csv(data_folder+'/data/reaction/uspto-50k_tpl_modified.csv')
 
     mode = ['train', 'val', 'test']
@@ -219,4 +217,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    data_folder = '/apdcephfs/private_yuewan/template_synthesis_dataset'
+    main(data_folder)
